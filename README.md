@@ -16,6 +16,12 @@
 - [] build endpoint
 - [] post from centralized endpoit to strapi.
 
+
+## Future change log
+
+- [] push via webhook a manual request rutine. this could be also performed via NEXT endpoints
+or via Social communication Bot (Discord, Slack)
+
 ## commands
 
 npm start to start check folder and transform routine.
