@@ -16,16 +16,18 @@ app.get("/", (req, res) => {
 });
 
 //FLUJO tranformacion CSV a JSON
-app.get('/csv', (req, res) => {
+app.get('/csv', (req, res) => { // enpoint example + query => http://localhost:4000/csv/?folder=bloomingdales&page=1
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
     res.header("Access-Control-Allow-Origin", "*")
+    let folder = req.query.folder;
+    let page = req.query.page;
 
-    const csvFilePath = 'src/csv/links_10.csv'; // your csv file path
+    const csvFilePath = `src/csv/${folder}/links_${page}.csv`; // your csv file path
     let jsonFilePath = 'src/json/' + currentTime + '.json'; // your json file path
-    let jsonParcedFilePath = 'src/json/' + currentTime + '_parced.json'; // your json file path
+    let jsonParcedFilePath = `src/json/${folder}_links_${page}.json`; // your json file path
     let store = null;
 
-    function UpdateProducts() {
+    function UpdateProducts(store) {
         console.log(chalk.green.bgBlue('Iniciando...'), 'proceso de transformacion CSV a JSON');
         csv()
             .fromFile(csvFilePath)
@@ -41,32 +43,32 @@ app.get('/csv', (req, res) => {
 
     function RebuildBody() {
         console.log(chalk.green.bgBlue('Iniciando...'), 'homologacion JSON Rakuten a JSON Strapi');
-        console.log("nuevo JSON", jsonFilePath);
+        console.log("folder", csvFilePath);
 
         let json = JSON.parse(fs.readFileSync(jsonFilePath, 'utf8'));
         let newJson = [];
 
-        let parcedImage = json[0]["LINK CODE"];
-
-        console.log(chalk.bgRed(parcedImage));
-
         function freshJSON() {
             json.forEach(element => {
                 let newElement = {};
-                newElement.RawLink = element["LINK CODE"];
-                newElement.ProductLink = element["LINK CODE"];
+                // newElement.RawLink = element["LINK CODE"];
+                newElement.ProductLink = element["LINK CODE"].split('href="')[1].split('"')[0];
                 newElement.ProductAdvertiser = element["ADVERTISER"];
                 newElement.ProductName = element["LINK NAME"];
                 newElement.linkid = element["LINK ID"];
                 newElement.ProductPrice = element["RETAIL PRICE"];
                 newElement.ProductSlug = element["CATEGORY"];
-                newElement.ProductImage = element["LINK ID"];
+                newElement.ProductImage = element["LINK CODE"].split('src="')[1].split('"')[0];;
+
+                //console.log(chalk.bgRed("RAW embbed code ..."));
+                // console.log(rawEmbed.split('src="')[1].split('"')[0]);
+
                 newJson.push(newElement);
-                // console.log(newElement)
+                console.log(newElement)
             })
             // console.log(chalk.bold.bgYellow("JSONinicio..."), newJson, chalk.bold.bgYellow("JSONtermino"));
             fs.writeFileSync(jsonParcedFilePath, JSON.stringify(newJson));
-            res.send("JSON Ready! : from RAkuten to Ellaglams format:  " +  JSON.stringify(newJson) + " from : " + store);
+            res.send("JSON Ready! : from RAkuten to Ellaglams format:  " + JSON.stringify(newJson) + " from : " + store);
 
         }
         freshJSON()
@@ -85,24 +87,5 @@ app.get('/csv', (req, res) => {
 
 });
 
-
-
-//transformar archivo a CSV
-// let content = [
-//     {
-//         "LINK CODE": "<a href=\"https://click.linksynergy.com/link?id=DEoPybET1Dw&offerid=803538.8806194046181&type=2&murl=https%3A%2F%2Fwww.macys.com%2Fshop%2Fproduct%2Ftonymoly-minions-lip-eye-makeup-remover-2-oz.%3FID%3D11109208%26PartnerID%3DLINKSHARE%26cm_mmc%3DLINKSHARE-_-4-_-0-_-MP40&LSNSUBSITE=PR\" rel=\"nofollow\"><IMG border=0 src=\"https://slimages.macysassets.com/is/image/MCY/products/8/optimized/17372708_fpx.tif?wid=1200&fmt=jpeg&qlt=100\" ></a><IMG border=0 width=1 height=1 src=\"https://ad.linksynergy.com/fs-bin/show?id=DEoPybET1Dw&bids=803538.8806194046181&type=2&subid=0\" >",
-//         "ADVERTISER": "Macys.com",
-//         "LINK NAME": "Tonymoly Minions Lip & Eye Makeup Remover, 2 oz.",
-//         "LINK ID": "8806194046181",
-//         "RETAIL PRICE": "9.0",
-//         "CATEGORY": "Beauty"
-//     },
-// ];
-
-
-
-
 // SUBIENDO CAMBIOS
-app.listen(process.env.PORT || 4000, function () {
-    console.log("listening on port 4000");
-});
+app.listen(process.env.PORT || 4000, function () { console.log("listening on port 4000"); });
