@@ -1,9 +1,10 @@
 import express from "express";
-import axios from "axios";
 import moment from "moment";
 import csv from "csvtojson";
 import * as fs from 'fs';
 import chalk from 'chalk';
+import { PostProductAPI } from './src/utils/PostProduct.js';
+import { GetProductsAPI } from "./src/utils/GetProducts.js";
 
 let currentTime = moment().format('dddd-h-mm-ss');
 
@@ -22,36 +23,38 @@ app.get('/csv', (req, res) => { // enpoint example + query => http://localhost:4
     let folder = req.query.folder;
     let page = req.query.page;
 
+    //filepaths
     const csvFilePath = `src/csv/${folder}/links_${page}.csv`; // your csv file path
-    let jsonFilePath = 'src/json/' + currentTime + '.json'; // your json file path
-    let jsonParcedFilePath = `src/json/${folder}_links_${page}.json`; // your json file path
-    let store = null;
+    let jsonFilePath = `src/json/${folder}_links_${page}.json`; // your json file path
+    let jsonParcedFilePath = `src/json/${folder}_links_${page}_compatible.json`; // your json file path
 
-    function UpdateProducts(store) {
-        console.log(chalk.green.bgBlue('Iniciando...'), 'proceso de transformacion CSV a JSON');
+    //convert CSV to JSON
+    function UpdateProducts() {
+        console.log(chalk.green.bgBlue('-> CSV 2 JSON Routine Started...'));
+        console.log("original csv file => ", chalk.green.blue(csvFilePath));
+
         csv()
             .fromFile(csvFilePath)
             .then((jsonObj) => {
                 fs.writeFileSync(jsonFilePath, JSON.stringify(jsonObj));
-                store = jsonObj[0]["ADVERTISER"]
-                console.log(chalk.bgGreen("-> JSON Ready! : "), chalk.green(moment().format('dddd-h-mm-ss')), "from", jsonObj[0]["ADVERTISER"]);
+                console.log('new file => ', chalk.green.blue(jsonFilePath));
+                console.log(moment().format('dddd-h-mm-ss'));
+                console.log(chalk.bgGreen("JSON Ready!..."));
             })
-            // .then(() => { res.send("JSON Ready! : " + moment().format('dddd-h-mm-ss') + " from : " + store); })
             .then(() => { RebuildBody(jsonFilePath); })
-            .then(() => { SendToStrapi(); })
     }
+    UpdateProducts();   //init
 
+    //Rebuild JSON Body
     function RebuildBody() {
-        console.log(chalk.green.bgBlue('Iniciando...'), 'homologacion JSON Rakuten a JSON Strapi');
-        console.log("folder", csvFilePath);
-
+        console.log(chalk.green.bgBlue('-> Rebuild JSON Started...'), "for Ellaglams Standard...");
+        console.log("original json file => ", chalk.green.blue(jsonFilePath));
         let json = JSON.parse(fs.readFileSync(jsonFilePath, 'utf8'));
         let newJson = [];
 
-        function freshJSON() {
+        function rebuildJSON() {
             json.forEach(element => {
                 let newElement = {};
-                // newElement.RawLink = element["LINK CODE"];
                 newElement.ProductLink = element["LINK CODE"].split('href="')[1].split('"')[0];
                 newElement.ProductAdvertiser = element["ADVERTISER"];
                 newElement.ProductName = element["LINK NAME"];
@@ -59,31 +62,33 @@ app.get('/csv', (req, res) => { // enpoint example + query => http://localhost:4
                 newElement.ProductPrice = element["RETAIL PRICE"];
                 newElement.ProductSlug = element["CATEGORY"];
                 newElement.ProductImage = element["LINK CODE"].split('src="')[1].split('"')[0];;
-
-                //console.log(chalk.bgRed("RAW embbed code ..."));
-                // console.log(rawEmbed.split('src="')[1].split('"')[0]);
-
                 newJson.push(newElement);
-                console.log(newElement)
             })
-            // console.log(chalk.bold.bgYellow("JSONinicio..."), newJson, chalk.bold.bgYellow("JSONtermino"));
             fs.writeFileSync(jsonParcedFilePath, JSON.stringify(newJson));
-            res.send("JSON Ready! : from RAkuten to Ellaglams format:  " + JSON.stringify(newJson) + " from : " + store);
-
+            console.log('new file => ', chalk.green.blue(jsonParcedFilePath));
+            console.log(moment().format('dddd-h-mm-ss'));
+            console.log(chalk.bgGreen("JSON Rebuild Ready!..."));
+            UploadProducts(jsonParcedFilePath);
         }
-        freshJSON()
-        // .then(() => {
-        //     fs.writeFileSync(jsonFilePath, JSON.stringify(newJson));
-        //     console.log(newJson);
-        // })
+        rebuildJSON()
     }
 
-    function SendToStrapi() {
-        console.log(chalk.green.bgBlue('Iniciando...'), 'envio de JSON a Strapi');
+    //Upload to Strapi 
+    function UploadProducts() {
+        console.log(chalk.green.bgBlue('-> Upload Routine Started...'), 'envio de JSON a Strapi');
+        console.log("original json file => ", chalk.green.blue(jsonFilePath));
+        let json = JSON.parse(fs.readFileSync(jsonParcedFilePath, 'utf8'));
+
+        function SendToStrapiAPI() {
+            console.log(chalk.bgRed('SUBIENDO OBJETO'));
+            json.forEach(element => {
+                PostProductAPI(element).then(data => { console.log(chalk.green("product uploaded  ->"), data.id, data.ProductName) })
+            })
+            res.send("PRODUCTS UPLOADED!...");
+        }
+        SendToStrapiAPI();
+        console.log(chalk.bgYellow.bold(json.length, "products uploaded to Strapi"));
     }
-
-
-    UpdateProducts();
 
 });
 
